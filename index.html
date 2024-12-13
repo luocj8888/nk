@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nike库存查询</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #000;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #333;
+        }
+        #result {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+        .stock-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .in-stock {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+        }
+        .out-of-stock {
+            background-color: #ffebee;
+            border-color: #ffcdd2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nike库存查询</h1>
+        <div class="form-group">
+            <label for="styleColor">货号:</label>
+            <input type="text" id="styleColor" placeholder="请输入货号 (例如: 414571-171)">
+        </div>
+        <div class="form-group">
+            <label for="storeId">店铺:</label>
+            <select id="storeId">
+                <option value="d40b5e87-adef-469f-92c2-6aafeadda3a3">金海</option>
+                <option value="424e646e-fab1-4c84-85f5-36665cb77be3">新世界</option>
+                <option value="c4fadd29-1d8f-460f-bcd4-6449d37f8411">大邱</option>
+            </select>
+        </div>
+        <button onclick="checkStock()">查询库存</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function checkStock() {
+            const styleColor = document.getElementById('styleColor').value.trim();
+            const storeId = document.getElementById('storeId').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!styleColor) {
+                alert('请输入货号');
+                return;
+            }
+
+            const url = `https://api.nike.com/deliver/available_gtins/v3?filter=styleColor(${styleColor})&filter=storeId(${storeId})&filter=method(INSTORE)`;
+            
+            try {
+                resultDiv.innerHTML = '正在查询...';
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('网络请求失败');
+                }
+
+                const data = await response.json();
+                
+                // 清空结果区域
+                resultDiv.innerHTML = '';
+                
+                // 获取选中的店铺名称
+                const storeName = document.getElementById('storeId').options[
+                    document.getElementById('storeId').selectedIndex
+                ].text;
+                
+                // 添加标题
+                const titleElement = document.createElement('h2');
+                titleElement.textContent = `${storeName}店铺库存情况`;
+                resultDiv.appendChild(titleElement);
+
+                // 处理返回的数据
+                if (data.objects && data.objects.length > 0) {
+                    data.objects.forEach(item => {
+                        const stockItem = document.createElement('div');
+                        stockItem.className = `stock-item ${item.available ? 'in-stock' : 'out-of-stock'}`;
+                        
+                        // 获取GTIN的最后两位作为尺码
+                        const size = item.gtin.slice(-2);
+                        const status = item.available ? '有库存' : '无库存';
+                        // 转换库存量显示
+                        let stockLevel;
+                        switch(item.level) {
+                            case 'LOW':
+                                stockLevel = '低';
+                                break;
+                            case 'MEDIUM':
+                                stockLevel = '中';
+                                break;
+                            case 'HIGH':
+                                stockLevel = '高';
+                                break;
+                            default:
+                                stockLevel = '未知';
+                        }
+                        // 格式化时间
+                        const updateTime = new Date(item.modificationDate).toLocaleString('zh-CN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+                        
+                        stockItem.innerHTML = `
+                            <div>尺码: ${size}</div>
+                            <div>库存状态: ${status}</div>
+                            <div>库存量: ${stockLevel}</div>
+                            <div>更新时间: ${updateTime.replace(/\//g, '-')}</div>
+                        `;
+                        
+                        resultDiv.appendChild(stockItem);
+                    });
+                } else {
+                    resultDiv.innerHTML = '<p>未找到库存信息</p>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">查询出错: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 
